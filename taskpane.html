@@ -27,7 +27,7 @@
   <div id="debug"></div>
 
   <script>
-    const VERSION = "v2";
+    const VERSION = "v3-fixed";
     const subjectEl = document.getElementById("subject");
     const bodyEl = document.getElementById("body");
     const debugEl = document.getElementById("debug");
@@ -50,6 +50,7 @@
     }
 
     function render(source) {
+      // Always pull the absolute latest item pointer directly off the context object
       const item = Office.context.mailbox.item;
       if (!item) { showEmpty(source); return; }
 
@@ -62,7 +63,9 @@
       bodyEl.textContent = "Loading…";
 
       item.body.getAsync(Office.CoercionType.Text, (result) => {
-        if (currentId !== id) return; // user already moved on to another email
+        // Prevent race condition overwrite if user quickly skipped to a different message
+        if (Office.context.mailbox.item && Office.context.mailbox.item.itemId !== id) return; 
+        
         if (result.status === Office.AsyncResultStatus.Succeeded) {
           bodyEl.textContent = result.value.trim() || "(empty body)";
         } else {
@@ -74,18 +77,21 @@
     Office.onReady(() => {
       document.getElementById("reload").addEventListener("click", () => render("reload button"));
 
-      // Normal path: Outlook tells us the selected email changed (pinned panel)
-      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, () => {
+      // Fix: Listen to item change notifications to keep context refreshed
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, (eventArgs) => {
         eventCount++;
         render("change event");
       });
 
-      // Safety net: if the event is missed, notice the email id changing
+      // Polling Engine Fallback
       setInterval(() => {
         const item = Office.context.mailbox.item;
-        if (item && item.itemId !== currentId) render("poll");
-      }, 1500);
+        if (item && item.itemId !== currentId) {
+          render("poll");
+        }
+      }, 1000);
 
+      // Initial execution on taskpane load
       render("startup");
     });
   </script>
