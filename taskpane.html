@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Email Body Viewer</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; padding: 12px; font-size: 14px; color: #222; }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    h1 { font-size: 15px; margin: 0; }
+    button { background: #0078d4; color: #fff; border: 0; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #106ebe; }
+    #subject { font-weight: 600; margin-bottom: 8px; word-break: break-word; }
+    #body { white-space: pre-wrap; word-break: break-word; border-top: 1px solid #ddd; padding-top: 8px; }
+    .muted { color: #777; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Email Body</h1>
+    <button id="reload" type="button">Reload</button>
+  </header>
+  <div id="subject" class="muted">Loading…</div>
+  <div id="body"></div>
+
+  <script>
+    const subjectEl = document.getElementById("subject");
+    const bodyEl = document.getElementById("body");
+
+    function showEmpty() {
+      subjectEl.textContent = "No email selected.";
+      subjectEl.className = "muted";
+      bodyEl.textContent = "";
+    }
+
+    function render() {
+      const item = Office.context.mailbox.item;
+      if (!item) { showEmpty(); return; }
+
+      subjectEl.className = "";
+      subjectEl.textContent = item.subject || "(no subject)";
+      bodyEl.textContent = "Loading…";
+
+      item.body.getAsync(Office.CoercionType.Text, (result) => {
+        // Ignore stale results if the user has already moved to another email
+        if (Office.context.mailbox.item !== item) return;
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          bodyEl.textContent = result.value.trim() || "(empty body)";
+        } else {
+          bodyEl.textContent = "Could not read the email body: " + result.error.message;
+        }
+      });
+    }
+
+    Office.onReady(() => {
+      document.getElementById("reload").addEventListener("click", render);
+      // Fires when a pinned pane's selected email changes
+      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, render);
+      render();
+    });
+  </script>
+</body>
+</html>
