@@ -29,8 +29,12 @@
     const subjectEl = document.getElementById("subject");
     const bodyEl = document.getElementById("body");
 
-    function readEmailOnLaunch() {
-      if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) return;
+    function readCurrentEmail() {
+      if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
+        subjectEl.textContent = "Outlook is not ready.";
+        bodyEl.textContent = "";
+        return;
+      }
 
       const item = Office.context.mailbox.item;
       if (!item) {
@@ -53,7 +57,21 @@
     const checkOfficeEngine = setInterval(() => {
       if (typeof Office !== 'undefined') {
         clearInterval(checkOfficeEngine);
-        Office.onReady(() => { readEmailOnLaunch(); });
+      Office.onReady(() => {
+        readCurrentEmail();
+
+        if (Office.context.mailbox.addHandlerAsync && Office.EventType.ItemChanged) {
+          Office.context.mailbox.addHandlerAsync(
+            Office.EventType.ItemChanged,
+            readCurrentEmail,
+            (result) => {
+              if (result.status !== Office.AsyncResultStatus.Succeeded) {
+                bodyEl.textContent = "Could not monitor the selected message: " + result.error.message;
+              }
+            }
+          );
+        }
+      });
       }
     }, 50);
   </script>
