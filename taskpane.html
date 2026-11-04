@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>NEW Email Body Viewer TEST</title>
-  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <title>Email Body Viewer</title>
+  <script src="https://microsoft.com"></script>
   <style>
     body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; padding: 12px; font-size: 14px; color: #222; }
     header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
@@ -27,7 +27,7 @@
   <div id="debug"></div>
 
   <script>
-    const VERSION = "v3-fixed";
+    const VERSION = "v4-SelectedItemsChanged";
     const subjectEl = document.getElementById("subject");
     const bodyEl = document.getElementById("body");
     const debugEl = document.getElementById("debug");
@@ -50,7 +50,6 @@
     }
 
     function render(source) {
-      // Always pull the absolute latest item pointer directly off the context object
       const item = Office.context.mailbox.item;
       if (!item) { showEmpty(source); return; }
 
@@ -63,13 +62,13 @@
       bodyEl.textContent = "Loading…";
 
       item.body.getAsync(Office.CoercionType.Text, (result) => {
-        // Prevent race condition overwrite if user quickly skipped to a different message
-        if (Office.context.mailbox.item && Office.context.mailbox.item.itemId !== id) return; 
+        // Double check against global context to prevent asynchronous race condition overwrites
+        if (Office.context.mailbox.item && Office.context.mailbox.item.itemId !== id) return;
         
         if (result.status === Office.AsyncResultStatus.Succeeded) {
           bodyEl.textContent = result.value.trim() || "(empty body)";
         } else {
-          bodyEl.textContent = "Could not read the email body: " + result.error.message;
+          bodyEl.textContent = "Could not read email body: " + result.error.message;
         }
       });
     }
@@ -77,21 +76,30 @@
     Office.onReady(() => {
       document.getElementById("reload").addEventListener("click", () => render("reload button"));
 
-      // Fix: Listen to item change notifications to keep context refreshed
-      Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, (eventArgs) => {
-        eventCount++;
-        render("change event");
-      });
+      // 1. Primary Event: Handle modern list selections (Reliable on New Outlook / Web)
+      if (Office.context.mailbox.addHandlerAsync) {
+        Office.context.mailbox.addHandlerAsync(Office.EventType.SelectedItemsChanged, (eventArgs) => {
+          eventCount++;
+          // Allow a brief delay for Outlook to map internal properties to the context item object
+          setTimeout(() => { render("SelectedItemsChanged event"); }, 100);
+        });
 
-      // Polling Engine Fallback
+        // 2. Secondary Event: Legacy reading pane switches 
+        Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, () => {
+          eventCount++;
+          render("ItemChanged event");
+        });
+      }
+
+      // 3. Fallback: Force a manual lookup check
       setInterval(() => {
         const item = Office.context.mailbox.item;
         if (item && item.itemId !== currentId) {
-          render("poll");
+          render("poll tracking");
         }
       }, 1000);
 
-      // Initial execution on taskpane load
+      // Trigger standard launch render execution
       render("startup");
     });
   </script>
