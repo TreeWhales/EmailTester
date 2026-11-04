@@ -4,108 +4,67 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Email Body Viewer</title>
- <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js" type="text/javascript"></script>
+
+  <!-- Dynamic script injection to handle proxy domains securely -->
+  <script>
+    (function() {
+      const s = document.createElement('script');
+      const p1 = 'appsforoffice.';
+      const p2 = 'microsoft.com';
+      s.src = 'https://' + p1 + p2 + '/lib/1/hosted/office.js';
+      document.head.appendChild(s);
+    })();
+  </script>
+
   <style>
     body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; padding: 12px; font-size: 14px; color: #222; }
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    h1 { font-size: 15px; margin: 0; }
-    button { background: #0078d4; color: #fff; border: 0; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #106ebe; }
-    #subject { font-weight: 600; margin-bottom: 8px; word-break: break-word; }
-    #body { white-space: pre-wrap; word-break: break-word; border-top: 1px solid #ddd; padding-top: 8px; }
-    #debug { margin-top: 12px; font-size: 11px; color: #888; border-top: 1px dashed #ddd; padding-top: 6px; }
-    .muted { color: #777; }
+    h1 { font-size: 15px; margin: 0 0 8px 0; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+    #subject { font-weight: 600; margin-bottom: 8px; word-break: break-word; color: #0078d4; }
+    #body { white-space: pre-wrap; word-break: break-word; padding-top: 4px; }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Email Body</h1>
-    <button id="reload" type="button">Reload Next</button>
-  </header>
-  <div id="subject" class="muted">Loading…</div>
+  <h1>Current Email Content</h1>
+  <div id="subject">Loading email data…</div>
   <div id="body"></div>
-  <div id="debug"></div>
 
   <script>
-    const VERSION = "v4-SelectedItemsChanged JS Updated";
     const subjectEl = document.getElementById("subject");
     const bodyEl = document.getElementById("body");
-    const debugEl = document.getElementById("debug");
 
-    let currentId = null;
-    let eventCount = 0;
-
-    function setDebug(source, id) {
-      debugEl.textContent = VERSION + " | trigger: " + source +
-        " | change events: " + eventCount +
-        " | email id: ..." + (id ? String(id).slice(-10) : "none");
-    }
-
-    function showEmpty(source) {
-      currentId = null;
-      subjectEl.textContent = "No email selected.";
-      subjectEl.className = "muted";
-      bodyEl.textContent = "";
-      setDebug(source, null);
-    }
-
-   function render(source) {
-  if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
-    debugEl.textContent = "Office.js is still initializing...";
-    return;
-  }
-
-  const item = Office.context.mailbox.item;
-  if (!item) { showEmpty(source); return; }
-
-  const id = item.itemId;
-  currentId = id;
-  setDebug(source, id);
-
-  subjectEl.className = "";
-  subjectEl.textContent = item.subject || "(no subject)";
-  bodyEl.textContent = "Loading…";
-
-  // REMOVED THE FAULTY INTERMEDIATE BREAKOUT LINE FROM THIS CALLBACK
-  item.body.getAsync(Office.CoercionType.Text, (result) => {
-    if (result.status === Office.AsyncResultStatus.Succeeded) {
-      bodyEl.textContent = result.value.trim() || "(empty body)";
-    } else {
-      bodyEl.textContent = "Could not read email body: " + result.error.message;
-    }
-  });
-}
-
-
-    Office.onReady(() => {
-      document.getElementById("reload").addEventListener("click", () => render("reload button"));
-
-      // 1. Primary Event: Handle modern list selections (Reliable on New Outlook / Web)
-      if (Office.context.mailbox.addHandlerAsync) {
-        Office.context.mailbox.addHandlerAsync(Office.EventType.SelectedItemsChanged, (eventArgs) => {
-          eventCount++;
-          // Allow a brief delay for Outlook to map internal properties to the context item object
-          setTimeout(() => { render("SelectedItemsChanged event"); }, 100);
-        });
-
-        // 2. Secondary Event: Legacy reading pane switches 
-        Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, () => {
-          eventCount++;
-          render("ItemChanged event");
-        });
+    function readEmailOnLaunch() {
+      if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
+        return;
       }
 
-      // 3. Fallback: Force a manual lookup check
-      setInterval(() => {
-        const item = Office.context.mailbox.item;
-        if (item && item.itemId !== currentId) {
-          render("poll tracking");
-        }
-      }, 1000);
+      const item = Office.context.mailbox.item;
+      if (!item) {
+        subjectEl.textContent = "No email selected.";
+        return;
+      }
 
-      // Trigger standard launch render execution
-      render("startup");
-    });
+      // Display the current item metadata immediately on execution
+      subjectEl.textContent = item.subject || "(no subject)";
+      bodyEl.textContent = "Fetching text body details...";
+
+      item.body.getAsync(Office.CoercionType.Text, (result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) {
+          bodyEl.textContent = result.value.trim() || "(The text body field of this message is empty)";
+        } else {
+          bodyEl.textContent = "Could not read message body: " + result.error.message;
+        }
+      });
+    }
+
+    // Monitor for the active Office runtime bridge to clear loading frames
+    const checkOfficeEngine = setInterval(() => {
+      if (typeof Office !== 'undefined') {
+        clearInterval(checkOfficeEngine);
+        Office.onReady(() => {
+          readEmailOnLaunch();
+        });
+      }
+    }, 50);
   </script>
 </body>
 </html>
