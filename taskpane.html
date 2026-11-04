@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Email Body Viewer</title>
-
-  <!-- Dynamic script injection to handle proxy domains securely -->
   <script>
     (function() {
       const s = document.createElement('script');
@@ -15,7 +13,6 @@
       document.head.appendChild(s);
     })();
   </script>
-
   <style>
     body { font-family: "Segoe UI", system-ui, sans-serif; margin: 0; padding: 12px; font-size: 14px; color: #222; }
     h1 { font-size: 15px; margin: 0 0 8px 0; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
@@ -33,9 +30,7 @@
     const bodyEl = document.getElementById("body");
 
     function readEmailOnLaunch() {
-      if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
-        return;
-      }
+      if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) return;
 
       const item = Office.context.mailbox.item;
       if (!item) {
@@ -43,26 +38,22 @@
         return;
       }
 
-      // Display the current item metadata immediately on execution
       subjectEl.textContent = item.subject || "(no subject)";
       bodyEl.textContent = "Fetching text body details...";
 
       item.body.getAsync(Office.CoercionType.Text, (result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
-          bodyEl.textContent = result.value.trim() || "(The text body field of this message is empty)";
+          bodyEl.textContent = result.value.trim() || "(The text body of this message is empty)";
         } else {
           bodyEl.textContent = "Could not read message body: " + result.error.message;
         }
       });
     }
 
-    // Monitor for the active Office runtime bridge to clear loading frames
     const checkOfficeEngine = setInterval(() => {
       if (typeof Office !== 'undefined') {
         clearInterval(checkOfficeEngine);
-        Office.onReady(() => {
-          readEmailOnLaunch();
-        });
+        Office.onReady(() => { readEmailOnLaunch(); });
       }
     }, 50);
   </script>
