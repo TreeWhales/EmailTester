@@ -49,29 +49,33 @@
       setDebug(source, null);
     }
 
-    function render(source) {
-      const item = Office.context.mailbox.item;
-      if (!item) { showEmpty(source); return; }
+   function render(source) {
+  if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
+    debugEl.textContent = "Office.js is still initializing...";
+    return;
+  }
 
-      const id = item.itemId;
-      currentId = id;
-      setDebug(source, id);
+  const item = Office.context.mailbox.item;
+  if (!item) { showEmpty(source); return; }
 
-      subjectEl.className = "";
-      subjectEl.textContent = item.subject || "(no subject)";
-      bodyEl.textContent = "Loading…";
+  const id = item.itemId;
+  currentId = id;
+  setDebug(source, id);
 
-      item.body.getAsync(Office.CoercionType.Text, (result) => {
-        // Double check against global context to prevent asynchronous race condition overwrites
-        if (Office.context.mailbox.item && Office.context.mailbox.item.itemId !== id) return;
-        
-        if (result.status === Office.AsyncResultStatus.Succeeded) {
-          bodyEl.textContent = result.value.trim() || "(empty body)";
-        } else {
-          bodyEl.textContent = "Could not read email body: " + result.error.message;
-        }
-      });
+  subjectEl.className = "";
+  subjectEl.textContent = item.subject || "(no subject)";
+  bodyEl.textContent = "Loading…";
+
+  // REMOVED THE FAULTY INTERMEDIATE BREAKOUT LINE FROM THIS CALLBACK
+  item.body.getAsync(Office.CoercionType.Text, (result) => {
+    if (result.status === Office.AsyncResultStatus.Succeeded) {
+      bodyEl.textContent = result.value.trim() || "(empty body)";
+    } else {
+      bodyEl.textContent = "Could not read email body: " + result.error.message;
     }
+  });
+}
+
 
     Office.onReady(() => {
       document.getElementById("reload").addEventListener("click", () => render("reload button"));
