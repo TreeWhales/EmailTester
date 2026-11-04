@@ -45,9 +45,31 @@
       subjectEl.textContent = item.subject || "(no subject)";
       bodyEl.textContent = "Fetching text body details...";
 
+      function showHtmlAsText(html) {
+        const documentFragment = new DOMParser().parseFromString(html, "text/html");
+        return (documentFragment.body.textContent || "").trim();
+      }
+
+      function readHtmlBody() {
+        item.body.getAsync(Office.CoercionType.Html, (htmlResult) => {
+          if (htmlResult.status !== Office.AsyncResultStatus.Succeeded) {
+            bodyEl.textContent = "Body returned no text. HTML fallback failed: " + htmlResult.error.message;
+            return;
+          }
+
+          const htmlText = showHtmlAsText(htmlResult.value || "");
+          bodyEl.textContent = htmlText || "Outlook returned an empty body for this item.";
+        });
+      }
+
       item.body.getAsync(Office.CoercionType.Text, (result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
-          bodyEl.textContent = result.value.trim() || "(The text body of this message is empty)";
+          const text = (result.value || "").trim();
+          if (text) {
+            bodyEl.textContent = text;
+          } else {
+            readHtmlBody();
+          }
         } else {
           bodyEl.textContent = "Could not read message body: " + result.error.message;
         }
@@ -57,21 +79,21 @@
     const checkOfficeEngine = setInterval(() => {
       if (typeof Office !== 'undefined') {
         clearInterval(checkOfficeEngine);
-      Office.onReady(() => {
-        readCurrentEmail();
+        Office.onReady(() => {
+          readCurrentEmail();
 
-        if (Office.context.mailbox.addHandlerAsync && Office.EventType.ItemChanged) {
-          Office.context.mailbox.addHandlerAsync(
-            Office.EventType.ItemChanged,
-            readCurrentEmail,
-            (result) => {
-              if (result.status !== Office.AsyncResultStatus.Succeeded) {
-                bodyEl.textContent = "Could not monitor the selected message: " + result.error.message;
+          if (Office.context.mailbox.addHandlerAsync && Office.EventType.ItemChanged) {
+            Office.context.mailbox.addHandlerAsync(
+              Office.EventType.ItemChanged,
+              readCurrentEmail,
+              (result) => {
+                if (result.status !== Office.AsyncResultStatus.Succeeded) {
+                  bodyEl.textContent = "Could not monitor the selected message: " + result.error.message;
+                }
               }
-            }
-          );
-        }
-      });
+            );
+          }
+        });
       }
     }, 50);
   </script>
