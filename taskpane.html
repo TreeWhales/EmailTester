@@ -18,16 +18,19 @@
     h1 { font-size: 15px; margin: 0 0 8px 0; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
     #subject { font-weight: 600; margin-bottom: 8px; word-break: break-word; color: #0078d4; }
     #body { white-space: pre-wrap; word-break: break-word; padding-top: 4px; }
+    #reload { margin-bottom: 8px; padding: 4px 10px; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>Current Email Content</h1>
+  <button id="reload" type="button">Reload current email</button>
   <div id="subject">Loading email data…</div>
   <div id="body"></div>
 
   <script>
     const subjectEl = document.getElementById("subject");
     const bodyEl = document.getElementById("body");
+    const reloadEl = document.getElementById("reload");
 
     function readCurrentEmail() {
       if (typeof Office === 'undefined' || !Office.context || !Office.context.mailbox) {
@@ -61,6 +64,8 @@
           bodyEl.textContent = htmlText || "Outlook returned an empty body for this item.";
         });
       }
+
+    reloadEl.addEventListener("click", readCurrentEmail);
 
       item.body.getAsync(Office.CoercionType.Text, (result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) {
